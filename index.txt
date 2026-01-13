@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>RPG Adventure – Card Battle</title>
+<style>
+body {
+    margin: 0;
+    background: linear-gradient(#0b0b0b,#000);
+    color: white;
+    font-family: Arial;
+}
+#top {
+    display:flex;
+    justify-content:space-between;
+    padding:10px;
+}
+.zone {
+    border:1px solid #444;
+    padding:5px;
+    margin:5px;
+}
+.card {
+    width:120px;
+    height:160px;
+    background:#222;
+    border:2px solid #555;
+    border-radius:8px;
+    padding:5px;
+    margin:5px;
+    cursor:pointer;
+}
+.card:hover { border-color:gold; }
+.hand, .field {
+    display:flex;
+    flex-wrap:wrap;
+}
+button {
+    padding:10px;
+    font-size:16px;
+}
+</style>
+</head>
+<body>
+
+<div id="top">
+    <div>❤️ Player: <span id="pHP">100</span> | 🔵 Mana: <span id="pMana">1</span></div>
+    <div>🤖 AI: <span id="aHP">100</span> | 🔵 Mana: <span id="aMana">1</span></div>
+</div>
+
+<h3>Your Field</h3>
+<div class="field" id="playerField"></div>
+
+<h3>Your Hand</h3>
+<div class="hand" id="playerHand"></div>
+
+<button onclick="endTurn()">End Turn</button>
+
+<script>
+
+const TYPES=[
+"Dark","Light","Grass","Water","Fire","Wind",
+"Galaxy","Black Hole","White Hole","Worm Hole",
+"Vesil","Shade","Lifeblood","Light Infection",
+"Enchanted","Godly","Golden","Trash","?what?",
+"Shadow","Storm","Ice","Lava","Poison","Crystal",
+"Arcane","Mystic","Thunder","Lightning","Time",
+"Space","Void","Spirit","Metal","Earth","Nature",
+"Beast","Demon","Angel","Celestial","Infernal",
+"Ocean","Sand","Smoke","Phantom","Quantum",
+"Radiant","Eternal","Solar","Lunar","Chaos","Harmony"
+];
+
+function makeCard(){
+    let type=TYPES[Math.floor(Math.random()*TYPES.length)];
+    let kind=["Creature","Spell","Item","Mana"][Math.floor(Math.random()*4)];
+    let cost=Math.floor(Math.random()*5)+1;
+    let power=Math.floor(Math.random()*10)+1;
+
+    let card={type,kind,cost,power,health:power+5};
+
+    if(type==="Fire") card.power+=5;
+    if(type==="Water") card.health+=5;
+    if(type==="Dark") card.power+=3;
+    if(type==="Light") card.health+=3;
+    if(type==="Trash"){card.power=1;card.cost=1;}
+    if(type==="?what?"){card.power+=15;card.cost=2;}
+
+    return card;
+}
+
+
+function makeDeck(){
+    let d=[];
+    for(let i=0;i<30;i++) d.push(makeCard());
+    return d;
+}
+
+let pHP=100,aHP=100;
+let pMana=1,aMana=1;
+let pDeck=makeDeck(),aDeck=makeDeck();
+let pHand=[],aHand=[];
+let pField=[],aField=[];
+
+
+function draw(deck,hand){
+    if(deck.length&&hand.length<7) hand.push(deck.pop());
+}
+
+function render(){
+    document.getElementById("pHP").textContent=pHP;
+    document.getElementById("aHP").textContent=aHP;
+    document.getElementById("pMana").textContent=pMana;
+    document.getElementById("aMana").textContent=aMana;
+
+    let h=document.getElementById("playerHand");
+    h.innerHTML="";
+    pHand.forEach((c,i)=>{
+        let d=document.createElement("div");
+        d.className="card";
+        d.innerHTML=`
+<b>${c.kind}</b><br>
+${c.type}<br>
+Cost: ${c.cost}<br>
+Power: ${c.power}
+`;
+        d.onclick=()=>playCard(i);
+        h.appendChild(d);
+    });
+
+    let f=document.getElementById("playerField");
+    f.innerHTML="";
+    pField.forEach(c=>{
+        let d=document.createElement("div");
+        d.className="card";
+        d.innerHTML=`
+<b>${c.type} Creature</b><br>
+⚔ ${c.power}<br>
+❤️ ${c.health}
+`;
+        f.appendChild(d);
+    });
+}
+
+
+function playCard(i){
+    let c=pHand[i];
+    if(c.cost>pMana) return;
+    pMana-=c.cost;
+    pHand.splice(i,1);
+
+    if(c.kind==="Creature") pField.push(c);
+    if(c.kind==="Spell") aHP-=c.power;
+    if(c.kind==="Item" && pField.length) pField[0].power+=c.power;
+    if(c.kind==="Mana") pMana+=2;
+
+    render();
+    checkWin();
+}
+
+function combat(att,def){
+    att.forEach(a=>{
+        if(def.length){
+            let d=def[0];
+            d.health-=a.power;
+            a.health-=d.power;
+            if(d.health<=0) def.shift();
+        }else{
+            a===undefined?null:(a===null?null:a===undefined?null:null);
+        }
+    });
+}
+
+
+function aiTurn(){
+    aMana++;
+    aHand.forEach((c,i)=>{
+        if(c.cost<=aMana){
+            aMana-=c.cost;
+            aHand.splice(i,1);
+            if(c.kind==="Creature") aField.push(c);
+            if(c.kind==="Spell") pHP-=c.power;
+            return;
+        }
+    });
+    combat(aField,pField);
+}
+
+
+function endTurn(){
+    pMana++;
+    draw(pDeck,pHand);
+    draw(aDeck,aHand);
+    combat(pField,aField);
+    aiTurn();
+    render();
+    checkWin();
+}
+
+
+function checkWin(){
+    if(pHP<=0){alert("AI Wins");location.reload();}
+    if(aHP<=0){alert("YOU WIN");location.reload();}
+}
+
+
+for(let i=0;i<5;i++){
+    draw(pDeck,pHand);
+    draw(aDeck,aHand);
+}
+render();
+</script>
+</body>
+</html>

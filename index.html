@@ -149,6 +149,11 @@ function draw(deck, hand, n) {
     if (deck.length) hand.push(deck.pop());
   }
 }
+function refillHand(deck, hand) {
+  while (hand.length < 5 && deck.length > 0) {
+    hand.push(deck.pop());
+  }
+}
 
 /* ===== PLAY CARD ===== */
 function playCard(card, isPlayer) {
@@ -236,3 +241,4 @@ function checkWin() {
 </script>
 </body>
 </html>
+

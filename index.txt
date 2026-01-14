@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Card Realms: 55</title>
+<style>
+body {
+  margin: 0;
+  background: #1a1a1a;
+  color: white;
+  font-family: Arial;
+}
+#game {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+.healthbar {
+  width: 200px;
+  height: 16px;
+  background: #333;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.health {
+  height: 100%;
+  background: linear-gradient(to right, #ff3333, #ff7777);
+}
+#top, #bottom {
+  padding: 10px;
+}
+#field {
+  flex: 1;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+}
+.hand {
+  display: flex;
+  gap: 6px;
+}
+.card {
+  width: 90px;
+  height: 130px;
+  background: #222;
+  border: 2px solid #555;
+  border-radius: 8px;
+  font-size: 11px;
+  padding: 4px;
+  cursor: pointer;
+}
+.card:hover {
+  border-color: gold;
+}
+button {
+  padding: 6px 12px;
+  margin-left: 10px;
+}
+.enemy {
+  opacity: 0.85;
+}
+</style>
+</head>
+<body>
+
+<div id="game">
+  <div id="top">
+    <div>Enemy HP</div>
+    <div class="healthbar"><div id="enemyHealth" class="health"></div></div>
+    <div class="hand" id="enemyHand"></div>
+  </div>
+
+  <div id="field">
+    <div>
+      <div>Mana: <span id="mana"></span></div>
+      <button onclick="endTurn()">End Turn</button>
+    </div>
+  </div>
+
+  <div id="bottom">
+    <div>Your HP</div>
+    <div class="healthbar"><div id="playerHealth" class="health"></div></div>
+    <div class="hand" id="playerHand"></div>
+  </div>
+</div>
+
+<script>
+/* ===== CARD TYPES ===== */
+const cardTypes = [
+  "Dark","Light","Fire","Water","Grass","Wind","Earth","Ice","Electric",
+  "Poison","Metal","Spirit","Void","Galaxy","Black Hole","White Hole",
+  "Worm Hole","Enchanted","Godly","Golden","Trash",
+  "Vessel","Shade","Lifeblood","Infection",
+  "Blood","Stone","Time","Shadow","Holy","Demon","Angel","Beast","Dragon",
+  "Tech","Rune","Crystal","Storm","Sand","Lava","Frostfire","Plasma",
+  "Mind","Soul","Chaos","Order","Myth","Ancient","Cosmic","Royal",
+  "Cursed","Blessed","???"
+]; // 55 types
+
+/* ===== GAME STATE ===== */
+let playerHP = 30;
+let enemyHP = 30;
+let mana = 1;
+let maxMana = 1;
+let playerDeck = [];
+let enemyDeck = [];
+let playerHand = [];
+let enemyHand = [];
+
+/* ===== CARD GENERATION ===== */
+function generateCard(type) {
+  let base = cardTypes.indexOf(type);
+  return {
+    name: type + " Card",
+    type,
+    cost: Math.max(1, base % 7),
+    damage: (base % 5) + 1,
+    heal: base % 10 === 0 ? 2 : 0,
+    effect: base % 8 === 0 ? "burn" : null
+  };
+}
+
+function buildDeck() {
+  let deck = [];
+  cardTypes.forEach(type => {
+    for (let i = 0; i < 100; i++) {
+      deck.push(generateCard(type));
+    }
+  });
+  return shuffle(deck);
+}
+
+/* ===== UTIL ===== */
+function shuffle(arr) {
+  return arr.sort(() => Math.random() - 0.5);
+}
+
+/* ===== SETUP ===== */
+playerDeck = buildDeck();
+enemyDeck = buildDeck();
+
+draw(playerDeck, playerHand, 5);
+draw(enemyDeck, enemyHand, 5);
+updateUI();
+
+/* ===== DRAW ===== */
+function draw(deck, hand, n) {
+  for (let i = 0; i < n; i++) {
+    if (deck.length) hand.push(deck.pop());
+  }
+}
+
+/* ===== PLAY CARD ===== */
+function playCard(card, isPlayer) {
+  if (isPlayer && card.cost > mana) return;
+
+  let targetHP = isPlayer ? "enemy" : "player";
+
+  if (card.damage) {
+    if (targetHP === "enemy") enemyHP -= card.damage;
+    else playerHP -= card.damage;
+  }
+
+  if (card.heal && isPlayer) {
+    playerHP = Math.min(30, playerHP + card.heal);
+  }
+
+  if (isPlayer) mana -= card.cost;
+
+  checkWin();
+  updateUI();
+}
+
+/* ===== AI TURN ===== */
+function aiTurn() {
+  let aiMana = maxMana;
+  enemyHand.forEach(card => {
+    if (card.cost <= aiMana) {
+      playCard(card, false);
+      aiMana -= card.cost;
+    }
+  });
+  enemyHand = [];
+  draw(enemyDeck, enemyHand, 5);
+}
+
+/* ===== TURN ===== */
+function endTurn() {
+  aiTurn();
+  maxMana = Math.min(10, maxMana + 1);
+  mana = maxMana;
+  draw(playerDeck, playerHand, 1);
+  updateUI();
+}
+
+/* ===== UI ===== */
+function updateUI() {
+  document.getElementById("mana").textContent = mana + "/" + maxMana;
+  document.getElementById("playerHealth").style.width = (playerHP / 30 * 100) + "%";
+  document.getElementById("enemyHealth").style.width = (enemyHP / 30 * 100) + "%";
+
+  let pHand = document.getElementById("playerHand");
+  pHand.innerHTML = "";
+  playerHand.forEach(card => {
+    let c = document.createElement("div");
+    c.className = "card";
+    c.innerHTML = `
+      <b>${card.name}</b><br>
+      Type: ${card.type}<br>
+      Cost: ${card.cost}<br>
+      DMG: ${card.damage}<br>
+      Heal: ${card.heal || 0}
+    `;
+    c.onclick = () => {
+      playCard(card, true);
+      playerHand.splice(playerHand.indexOf(card), 1);
+    };
+    pHand.appendChild(c);
+  });
+
+  let eHand = document.getElementById("enemyHand");
+  eHand.innerHTML = "";
+  enemyHand.forEach(card => {
+    let c = document.createElement("div");
+    c.className = "card enemy";
+    c.textContent = card.name;
+    eHand.appendChild(c);
+  });
+}
+
+/* ===== WIN CHECK ===== */
+function checkWin() {
+  if (playerHP <= 0) alert("You Lost!");
+  if (enemyHP <= 0) alert("You Win!");
+}
+</script>
+</body>
+</html>

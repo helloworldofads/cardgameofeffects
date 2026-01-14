@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>RPG Adventure – Card Battle</title>
+
+<style>
+body{
+    margin:0;
+    background:#0b0b0b;
+    color:white;
+    font-family:Arial;
+}
+.bar{
+    width:200px;
+    height:20px;
+    background:#333;
+    border:1px solid #666;
+}
+.fill{
+    height:100%;
+    background:linear-gradient(to right,#0f0,#090);
+}
+#top{
+    display:flex;
+    justify-content:space-between;
+    padding:10px;
+}
+.zone{
+    margin:10px;
+}
+.hand,.field{
+    display:flex;
+    flex-wrap:wrap;
+}
+.card{
+    width:120px;
+    height:165px;
+    background:#222;
+    border:2px solid #555;
+    border-radius:8px;
+    padding:5px;
+    margin:5px;
+    cursor:pointer;
+}
+.card:hover{border-color:gold;}
+button{
+    padding:10px;
+    font-size:16px;
+}
+small{opacity:.8;}
+</style>
+</head>
+
+<body>
+
+<div id="top">
+    <div>
+        PLAYER
+        <div class="bar"><div class="fill" id="pBar"></div></div>
+        Mana: <span id="pMana"></span>
+    </div>
+
+    <div>
+        AI
+        <div class="bar"><div class="fill" id="aBar"></div></div>
+        Mana: <span id="aMana"></span>
+    </div>
+</div>
+
+<h3>AI Hand</h3>
+<div class="hand" id="aiHand"></div>
+
+<h3>Your Field</h3>
+<div class="field" id="playerField"></div>
+
+<h3>Your Hand</h3>
+<div class="hand" id="playerHand"></div>
+
+<button onclick="endTurn()">End Turn</button>
+
+<script>
+
+const TYPES=[
+"Dark","Light","Grass","Water","Fire","Wind",
+"Galaxy","Black Hole","White Hole","Worm Hole",
+"Vesil","Shade","Lifeblood","Light Infection",
+"Enchanted","Godly","Golden","Trash","?what?",
+"Shadow","Storm","Ice","Lava","Poison","Crystal",
+"Arcane","Mystic","Thunder","Lightning","Time",
+"Space","Void","Spirit","Metal","Earth","Nature",
+"Beast","Demon","Angel","Celestial","Infernal",
+"Ocean","Sand","Smoke","Phantom","Quantum",
+"Radiant","Eternal","Solar","Lunar","Chaos","Harmony"
+];
+
+const ADJ=["Ancient","Cursed","Blessed","Feral","Eternal","Shattered","Wild","Cosmic","Lost","Sacred"];
+const NOUN_CREATURE=["Guardian","Ravager","Knight","Beast","Warden","Spirit","Fiend"];
+const NOUN_SPELL=["Blast","Surge","Rift","Curse","Wave","Strike"];
+const NOUN_ITEM=["Relic","Charm","Blade","Totem","Core"];
+
+function makeCard(){
+    let type=TYPES[Math.floor(Math.random()*TYPES.length)];
+    let kind=["Creature","Spell","Item","Mana"][Math.floor(Math.random()*4)];
+    let cost=Math.floor(Math.random()*5)+1;
+    let power=Math.floor(Math.random()*8)+2;
+
+    let namePart=ADJ[Math.floor(Math.random()*ADJ.length)];
+    let noun;
+
+    if(kind==="Creature") noun=NOUN_CREATURE[Math.floor(Math.random()*NOUN_CREATURE.length)];
+    if(kind==="Spell") noun=NOUN_SPELL[Math.floor(Math.random()*NOUN_SPELL.length)];
+    if(kind==="Item") noun=NOUN_ITEM[Math.floor(Math.random()*NOUN_ITEM.length)];
+    if(kind==="Mana") noun="Mana Crystal";
+
+    let card={
+        name:`${namePart} ${type} ${noun}`,
+        type,kind,cost,power,
+        health:power+5
+    };
+
+    if(type==="Fire") card.power+=4;
+    if(type==="Water") card.health+=4;
+    if(type==="Dark") card.power+=3;
+    if(type==="Light") card.health+=3;
+    if(type==="Trash"){card.power=1;card.cost=1;}
+    if(type==="?what?"){card.power+=12;card.cost=2;}
+
+    return card;
+}
+
+function makeDeck(){
+    let d=[];
+    for(let i=0;i<30;i++) d.push(makeCard());
+    return d;
+}
+
+let pHP=100,aHP=100;
+let pMana=1,aMana=1;
+let pDeck=makeDeck(),aDeck=makeDeck();
+let pHand=[],aHand=[];
+let pField=[],aField=[];
+
+function draw(deck,hand){
+    if(deck.length&&hand.length<7) hand.push(deck.pop());
+}
+
+function render(){
+    document.getElementById("pMana").textContent=pMana;
+    document.getElementById("aMana").textContent=aMana;
+
+    document.getElementById("pBar").style.width=pHP+"%";
+    document.getElementById("aBar").style.width=aHP+"%";
+
+    let ph=document.getElementById("playerHand");
+    ph.innerHTML="";
+    pHand.forEach((c,i)=>{
+        let d=document.createElement("div");
+        d.className="card";
+        d.innerHTML=`
+<b>${c.name}</b><br>
+<small>${c.kind} • ${c.type}</small><br>
+Cost: ${c.cost}<br>
+Power: ${c.power}
+`;
+        d.onclick=()=>playCard(i);
+        ph.appendChild(d);
+    });
+
+    let ah=document.getElementById("aiHand");
+    ah.innerHTML="";
+    aHand.forEach(c=>{
+        let d=document.createElement("div");
+        d.className="card";
+        d.innerHTML=`
+<b>${c.name}</b><br>
+<small>${c.kind}</small><br>
+Cost:${c.cost}
+`;
+        ah.appendChild(d);
+    });
+
+    let pf=document.getElementById("playerField");
+    pf.innerHTML="";
+    pField.forEach(c=>{
+        let d=document.createElement("div");
+        d.className="card";
+        d.innerHTML=`
+<b>${c.name}</b><br>
+⚔ ${c.power}<br>
+❤️ ${c.health}
+`;
+        pf.appendChild(d);
+    });
+}
+
+function playCard(i){
+    let c=pHand[i];
+    if(c.cost>pMana) return;
+    pMana-=c.cost;
+    pHand.splice(i,1);
+
+    if(c.kind==="Creature") pField.push(c);
+    if(c.kind==="Spell") aHP-=c.power;
+    if(c.kind==="Item" && pField.length) pField[0].power+=c.power;
+    if(c.kind==="Mana") pMana+=2;
+
+    render(); checkWin();
+}
+
+function combat(att,def){
+    att.forEach(a=>{
+        if(def.length){
+            let d=def[0];
+            d.health-=a.power;
+            a.health-=d.power;
+            if(d.health<=0) def.shift();
+        }else{
+            aHP-=a.power;
+        }
+    });
+}
+
+
+function aiTurn(){
+    aMana++;
+    for(let i=0;i<aHand.length;i++){
+        let c=aHand[i];
+        if(c.cost<=aMana){
+            aMana-=c.cost;
+            aHand.splice(i,1);
+            if(c.kind==="Creature") aField.push(c);
+            if(c.kind==="Spell") pHP-=c.power;
+            break;
+        }
+    }
+    combat(aField,pField);
+}
+
+function endTurn(){
+    pMana++;
+    draw(pDeck,pHand);
+    draw(aDeck,aHand);
+    combat(pField,aField);
+    aiTurn();
+    render(); checkWin();
+}
+
+function checkWin(){
+    if(pHP<=0){alert("AI Wins");location.reload();}
+    if(aHP<=0){alert("YOU WIN");location.reload();}
+}
+
+for(let i=0;i<5;i++){
+    draw(pDeck,pHand);
+    draw(aDeck,aHand);
+}
+render();
+</script>
+</body>
+</html>
